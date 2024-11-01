@@ -13,6 +13,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	defer l.Close()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -20,7 +22,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		handleConnection(conn)
+		go handleConnection(conn)
 	}
 }
 
