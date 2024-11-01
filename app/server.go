@@ -6,10 +6,6 @@ import (
 	"os"
 )
 
-// Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
-
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
@@ -24,10 +20,26 @@ func main() {
 			os.Exit(1)
 		}
 
+		handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	buf := make([]byte, 4096)
+
+	for {
+		n, err := conn.Read(buf)
+		if err != nil || n == 0 {
+			return
+		}
+
 		if _, err := conn.Write([]byte("+PONG\r\n")); err != nil {
 			fmt.Println("Error write +PONG: ", err.Error())
 		}
-
-		conn.Close()
+		if err != nil {
+			return
+		}
 	}
 }
