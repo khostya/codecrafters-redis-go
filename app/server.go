@@ -1,11 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 )
 
 func main() {
@@ -33,6 +31,8 @@ func handleConnection(conn net.Conn) {
 
 	buf := make([]byte, 4096)
 
+	redis := NewRedis()
+
 	for {
 		n, err := conn.Read(buf)
 		if err != nil || n == 0 {
@@ -47,67 +47,28 @@ func handleConnection(conn net.Conn) {
 			continue
 		}
 
-		if arr[0] == "PING" {
+		switch arr[0] {
+		case "PING":
 			_, _ = conn.Write(encodeString("PONG"))
-		} else if arr[0] == "ECHO" {
+		case "ECHO":
 			_, _ = conn.Write(encodeString(arr[1]))
-		}
-	}
-}
+		case "GET":
+			key := arr[1]
 
-func decode(buf []byte) ([]string, []byte, error) {
-	s := string(buf[0])
-	buf = buf[1:]
-
-	if s == "*" {
-		return array(buf)
-	}
-	return nil, nil, errors.New("Unknown command: " + s)
-}
-
-func array(buf []byte) ([]string, []byte, error) {
-	s := string(buf)
-	println(s)
-
-	arr := make([]string, 0)
-
-	n, err := strconv.Atoi(string(buf[0]))
-	if err != nil {
-		return nil, nil, err
-	}
-	buf = buf[3:]
-	println(arr, n)
-
-	for i := 0; i < n; i++ {
-		s := string(buf)
-		println(s)
-
-		ch := string(buf[0])
-		if ch == "$" {
-			s, b, err := str(buf)
-			buf = b
-
-			if err != nil {
-				return nil, nil, err
+			value, ok := redis.Get(key)
+			if !ok {
+				conn.Write(encodeString("key not found"))
+			} else {
+				conn.Write(encodeString(value.(string)))
 			}
-			arr = append(arr, s)
+		case "SET":
+			key := arr[1]
+			value := arr[2]
+
+			redis.Set(key, value)
+			conn.Write(encodeString("OK"))
+		default:
+			_, _ = conn.Write(encodeString("PONG"))
 		}
 	}
-
-	return arr, buf, nil
-}
-
-func str(buf []byte) (string, []byte, error) {
-	buf = buf[1:]
-
-	n, err := strconv.Atoi(string(buf[0]))
-	if err != nil {
-		return "", nil, err
-	}
-
-	return string(buf[3 : n+3]), buf[n+5:], nil
-}
-
-func encodeString(s string) []byte {
-	return []byte(fmt.Sprintf("+%s\r\n", s))
 }
