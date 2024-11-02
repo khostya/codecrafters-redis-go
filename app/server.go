@@ -2,8 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/decode"
+	"github.com/codecrafters-io/redis-starter-go/app/encode"
+	redis2 "github.com/codecrafters-io/redis-starter-go/app/redis"
 	"net"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func main() {
@@ -31,7 +37,7 @@ func handleConnection(conn net.Conn) {
 
 	buf := make([]byte, 4096)
 
-	redis := NewRedis()
+	redis := redis2.NewRedis()
 
 	for {
 		n, err := conn.Read(buf)
@@ -39,9 +45,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		println(string(buf[:n]))
-
-		arr, _, err := decode(buf)
+		arr, _, err := decode.Decode(buf)
 		if err != nil {
 			conn.Write([]byte(fmt.Errorf("error decode command: %w", err).Error()))
 			continue
@@ -49,26 +53,35 @@ func handleConnection(conn net.Conn) {
 
 		switch arr[0] {
 		case "PING":
-			_, _ = conn.Write(encodeString("PONG"))
+			_, _ = conn.Write(encode.String("PONG"))
 		case "ECHO":
-			_, _ = conn.Write(encodeString(arr[1]))
+			_, _ = conn.Write(encode.String(arr[1]))
 		case "GET":
 			key := arr[1]
 
 			value, ok := redis.Get(key)
 			if !ok {
-				conn.Write(encodeString("key not found"))
+				conn.Write(encode.Null())
 			} else {
-				conn.Write(encodeString(value.(string)))
+				conn.Write(encode.String(value.(string)))
 			}
 		case "SET":
 			key := arr[1]
 			value := arr[2]
 
-			redis.Set(key, value)
-			conn.Write(encodeString("OK"))
+			var dur = time.Hour * 24 * 365
+			if len(arr) > 3 && strings.ToLower(arr[3]) == "px" {
+				ml, err := strconv.Atoi(arr[4])
+				if err != nil {
+					conn.Write([]byte(err.Error()))
+				}
+				dur = time.Millisecond * time.Duration(ml)
+			}
+
+			redis.Set(key, value, dur)
+			conn.Write(encode.String("OK"))
 		default:
-			_, _ = conn.Write(encodeString("PONG"))
+			_, _ = conn.Write(encode.String("PONG"))
 		}
 	}
 }

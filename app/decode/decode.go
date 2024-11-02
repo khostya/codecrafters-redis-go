@@ -1,4 +1,4 @@
-package main
+package decode
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-func decode(buf []byte) ([]string, []byte, error) {
+func Decode(buf []byte) ([]string, []byte, error) {
 	s := string(buf[0])
 	buf = buf[1:]
 
@@ -25,8 +25,7 @@ func array(length int, buf []byte) ([]string, []byte, error) {
 	arr := make([]string, 0)
 
 	for i := 0; i < length; i++ {
-		s := string(buf)
-		println(s)
+		log(buf)
 
 		ch := string(buf[0])
 		if ch == "$" {
@@ -71,6 +70,5 @@ func scanInt(buf []byte) (int, []byte, error) {
 }
 
 func log(buf []byte) {
-	s := string(buf)
-	println(s)
+
 }
