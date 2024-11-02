@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/decode"
 	"github.com/codecrafters-io/redis-starter-go/app/encode"
@@ -12,7 +13,19 @@ import (
 	"time"
 )
 
+var (
+	dir        string
+	dbfilename string
+)
+
+func init() {
+	flag.StringVar(&dir, "dir", "/tmp/redis-data", "directory to store files")
+	flag.StringVar(&dbfilename, "dbfilename", "codecrafters.db", "filename to store redis file")
+	flag.Parse()
+}
+
 func main() {
+	flag.Parse()
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379: ", err.Error())
@@ -52,6 +65,16 @@ func handleConnection(conn net.Conn) {
 		}
 
 		switch arr[0] {
+		case "CONFIG":
+			switch arr[1] {
+			case "GET":
+				switch arr[2] {
+				case "dir":
+					_, _ = conn.Write(encode.List("dir", dir))
+				case "dbfilename":
+					_, _ = conn.Write(encode.List("dbfilename", dbfilename))
+				}
+			}
 		case "PING":
 			_, _ = conn.Write(encode.String("PONG"))
 		case "ECHO":
@@ -61,9 +84,9 @@ func handleConnection(conn net.Conn) {
 
 			value, ok := redis.Get(key)
 			if !ok {
-				conn.Write(encode.Null())
+				_, _ = conn.Write(encode.Null())
 			} else {
-				conn.Write(encode.String(value.(string)))
+				_, _ = conn.Write(encode.String(value.(string)))
 			}
 		case "SET":
 			key := arr[1]
@@ -74,6 +97,7 @@ func handleConnection(conn net.Conn) {
 				ml, err := strconv.Atoi(arr[4])
 				if err != nil {
 					conn.Write([]byte(err.Error()))
+					continue
 				}
 				dur = time.Millisecond * time.Duration(ml)
 			}
